@@ -11,6 +11,8 @@
 #include <chrono>
 #include <thread>
 
+
+// d3d12
 #include <d3d12.h>
 #include <dxgi.h>
 #include <dxgi1_6.h>
@@ -19,6 +21,9 @@
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
 #pragma comment(lib,"winmm.lib")
+
+// vulkan
+#include <vulkan/vulkan.hpp>
 
 LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
@@ -58,7 +63,7 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 	wndClass.lpfnWndProc = WinProc;
 	wndClass.lpszClassName = "HinomaruEngine";
 	wndClass.hInstance = GetModuleHandle(NULL);
-	wndClass.hCursor = LoadCursor(NULL,IDC_ARROW);
+	wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wndClass.hIcon = nullptr;
 
 	RegisterClassEx(&wndClass);
@@ -76,6 +81,38 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 
 	ShowWindow(hwnd, SW_SHOW);
 
+	// -------- setup vulkan ---------------------------------------------------------------
+
+	VkInstance vkInstance;
+	VkApplicationInfo vkAppInfo = {};
+	vkAppInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+	vkAppInfo.pApplicationName = "Test Vulkan";
+	vkAppInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+	vkAppInfo.pEngineName = "No Engine";
+	vkAppInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+	vkAppInfo.apiVersion = VK_API_VERSION_1_0;
+
+	VkInstanceCreateInfo vkCreateInfo = {};
+	vkCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+	vkCreateInfo.pApplicationInfo = &vkAppInfo;
+
+	VkResult vkResult = vkCreateInstance(&vkCreateInfo, nullptr, &vkInstance);
+
+	VkPhysicalDevice vkPhysicDevice = VK_NULL_HANDLE;
+	uint32_t vkDeviceCount = 0;
+	vkEnumeratePhysicalDevices(vkInstance, &vkDeviceCount, nullptr);
+	if (vkDeviceCount == 0)return -1;
+
+	std::vector<VkPhysicalDevice> tempVkDevices(vkDeviceCount);
+	vkEnumeratePhysicalDevices(vkInstance, &vkDeviceCount, tempVkDevices.data());
+
+
+
+	VkDeviceCreateInfo vkDeviceCreateInfo = {};
+	VkAllocationCallbacks vkAllocCB = {};
+	VkDevice vkDevice = {};
+
+	//vkCreateDevice(vkPhysicDevice,&vkDeviceCreateInfo,&vkAllocCB,&vkDevice);
 
 	// -------- setup d3d12 ----------------------------------------------------------------
 
@@ -160,6 +197,8 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 
 	ID3D12GraphicsCommandList* pCmdList = nullptr;
 	hr = pDevice->CreateCommandList(cmdQueueDesc.NodeMask, D3D12_COMMAND_LIST_TYPE_DIRECT, pCmdAlloc, nullptr, GET_IID(&pCmdList));
+
+
 
 	const UInt32 FRAME_COUNT = 2;
 	DXGI_SWAP_CHAIN_DESC1 swapchainDesc = {};

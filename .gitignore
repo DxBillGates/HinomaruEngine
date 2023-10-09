@@ -29,6 +29,8 @@
 *.la
 *.a
 *.lib
+!/TestProjects/gates/TestProject/external/Vulkan/Lib/*.lib
+ 
 
 # Executables
 *.exe
@@ -37,4 +39,3 @@
 
 .vs/
 x64/
-
