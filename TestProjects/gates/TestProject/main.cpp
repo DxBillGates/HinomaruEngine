@@ -2,15 +2,26 @@
 
 #include <Windows.h>
 #include <crtdbg.h>
+#include <stdio.h>
 
 #define SAFE_RELEASE(p) p->Release()
 #define GET_IID(ppType) IID_PPV_ARGS(ppType)
+
+void PrintLog(const char* format, ...)
+{
+	char buf[256];
+	va_list  args;
+	va_start(args, format);
+	vsprintf_s(buf, format, args);
+	OutputDebugString(buf);
+	va_end(args);
+}
 
 #include <string>
 #include <vector>
 #include <chrono>
 #include <thread>
-
+#include <optional>
 
 // d3d12
 #include <d3d12.h>
@@ -83,6 +94,7 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 
 	// -------- setup vulkan ---------------------------------------------------------------
 
+	// vulkan instance set up
 	VkInstance vkInstance;
 	VkApplicationInfo vkAppInfo = {};
 	vkAppInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -98,21 +110,100 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 
 	VkResult vkResult = vkCreateInstance(&vkCreateInfo, nullptr, &vkInstance);
 
-	VkPhysicalDevice vkPhysicDevice = VK_NULL_HANDLE;
+	// search physics device and create instance
+	VkPhysicalDevice vkPhysicsDevice = VK_NULL_HANDLE;
 	uint32_t vkDeviceCount = 0;
 	vkEnumeratePhysicalDevices(vkInstance, &vkDeviceCount, nullptr);
+
+	// does not supported gpu
 	if (vkDeviceCount == 0)return -1;
 
 	std::vector<VkPhysicalDevice> tempVkDevices(vkDeviceCount);
 	vkEnumeratePhysicalDevices(vkInstance, &vkDeviceCount, tempVkDevices.data());
 
+	auto IsDeviceSuitable = [](VkPhysicalDevice physicsDevice)
+	{
+		// get device prop
+		VkPhysicalDeviceProperties deviceProp = {};
+		vkGetPhysicalDeviceProperties(physicsDevice, &deviceProp);
 
+		// get device feature level
+		VkPhysicalDeviceFeatures deviceFeature = {};
+		vkGetPhysicalDeviceFeatures(physicsDevice, &deviceFeature);
+
+		// print log
+		PrintLog("[Check Vulkan PhysicalDevice]\n");
+		PrintLog("-apiVersion    : %u\n", deviceProp.apiVersion);
+		PrintLog("-driverVersion : %u\n", deviceProp.driverVersion);
+		PrintLog("-vendorID      : %u\n", deviceProp.vendorID);
+		PrintLog("-deviceID      : %u\n", deviceProp.deviceID);
+		PrintLog("-deviceName    : %s\n", deviceProp.deviceName);
+
+		return deviceProp.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && deviceFeature.geometryShader;
+	};
+
+	for (const auto& device : tempVkDevices)
+	{
+		if (IsDeviceSuitable(device))
+		{
+			vkPhysicsDevice = device;
+		}
+	}
+
+	// does not find physics device
+	if (vkPhysicsDevice == VK_NULL_HANDLE)return -1;
+
+	// find queue
+	struct QueueFamilyIndices
+	{
+		std::optional<UInt32> graphicsfamily;
+	};
+
+	auto FindQueueFamilies = [](VkPhysicalDevice device)->QueueFamilyIndices
+	{
+		QueueFamilyIndices indices;
+
+		UInt32 queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+		std::vector<VkQueueFamilyProperties> queueFamilyProps(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilyProps.data());
+
+		Int32 i = 0;
+		for (const auto& queueFamilyProp : queueFamilyProps)
+		{
+			if (queueFamilyProp.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
+				indices.graphicsfamily = i;
+			}
+			++i;
+		}
+
+		return indices;
+	};
+
+	QueueFamilyIndices queueFamilyIndices = FindQueueFamilies(vkPhysicsDevice);
+	VkDeviceQueueCreateInfo vkQueueCreateInfo = {};
+	vkQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+	vkQueueCreateInfo.queueFamilyIndex = queueFamilyIndices.graphicsfamily.value();
+	vkQueueCreateInfo.queueCount = 1;
+	float queuePriority = 1.0f;
+	vkQueueCreateInfo.pQueuePriorities = &queuePriority;
+
+	VkPhysicalDeviceFeatures vkPhysicsDeviceFeature = {};
 
 	VkDeviceCreateInfo vkDeviceCreateInfo = {};
-	VkAllocationCallbacks vkAllocCB = {};
+	vkDeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	vkDeviceCreateInfo.pQueueCreateInfos = &vkQueueCreateInfo;
+	vkDeviceCreateInfo.queueCreateInfoCount = 1;
+	vkDeviceCreateInfo.pEnabledFeatures = &vkPhysicsDeviceFeature;
+	vkDeviceCreateInfo.enabledExtensionCount = 0;
+
 	VkDevice vkDevice = {};
 
-	//vkCreateDevice(vkPhysicDevice,&vkDeviceCreateInfo,&vkAllocCB,&vkDevice);
+	vkCreateDevice(vkPhysicsDevice, &vkDeviceCreateInfo, nullptr, &vkDevice);
+
+	VkQueue vkQueue = {};
+	vkGetDeviceQueue(vkDevice, queueFamilyIndices.graphicsfamily.value(), 0, &vkQueue);
 
 	// -------- setup d3d12 ----------------------------------------------------------------
 
@@ -198,8 +289,6 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 	ID3D12GraphicsCommandList* pCmdList = nullptr;
 	hr = pDevice->CreateCommandList(cmdQueueDesc.NodeMask, D3D12_COMMAND_LIST_TYPE_DIRECT, pCmdAlloc, nullptr, GET_IID(&pCmdList));
 
-
-
 	const UInt32 FRAME_COUNT = 2;
 	DXGI_SWAP_CHAIN_DESC1 swapchainDesc = {};
 	swapchainDesc.BufferCount = FRAME_COUNT;
@@ -245,6 +334,9 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 		endTime = std::chrono::system_clock::now();
 		frameTime = (float)std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() / 1000.f / 1000.f;
 
+		// ブレイクポイント対応 : 3秒以上立っているならブレイクポイントとみなして強制的に60fpsとする
+		if (frameTime > 3.0f)frameTime = 0.016f;
+
 		//// fps調整
 		//const float FRAMERATE = 70.f;
 		//const float WAIT_FRAMETIME = 1.f / FRAMERATE;
@@ -265,9 +357,7 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 		startTime = endTime;
 		fps = 1.0f / frameTime;
 
-		char pStrBuf[256];
-		sprintf_s(pStrBuf, "fps : %d\n", (Int32)fps);
-		OutputDebugString(pStrBuf); 
+		PrintLog("fps : %d\n", (Int32)fps);
 
 		// update
 
