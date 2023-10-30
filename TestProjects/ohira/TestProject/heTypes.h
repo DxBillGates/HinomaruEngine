@@ -17,5 +17,8 @@ namespace he
 	// floating point number types definition
 	using f32	= float;
 	using f64	= double;
+
+	// other
+	using bl	= bool;
 }
 #endif // __HE_TYPES_H__
