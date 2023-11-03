@@ -130,10 +130,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="heCore.h" />
+    <ClInclude Include="heCoroutine.h" />
     <ClInclude Include="heTypes.h" />
     <ClInclude Include="hePlatform.h" />
+    <ClInclude Include="heThread.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="heCoroutine.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

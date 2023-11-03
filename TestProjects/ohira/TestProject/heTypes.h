@@ -1,6 +1,9 @@
 #ifndef __HE_TYPES_H__
 #define __HE_TYPES_H__
 #include <stdint.h>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
 namespace he
 {
@@ -18,7 +21,17 @@ namespace he
 	using f32	= float;
 	using f64	= double;
 
-	// other
+	// boolean
 	using bl	= bool;
+
+	// byte
+	using bt	= uint8_t;
+
+	// thread
+	using thread		= std::thread;
+	using thread_mutex	= std::mutex;
+	using thread_cond	= std::condition_variable;
+
+#define COROUTINE struct
 }
 #endif // __HE_TYPES_H__
