@@ -144,9 +144,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ProcessDataProfiler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreTypes.h" />
+    <ClInclude Include="Debug.h" />
+    <ClInclude Include="ProcessDataProfiler.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

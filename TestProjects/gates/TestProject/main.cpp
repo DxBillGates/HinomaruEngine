@@ -1,21 +1,11 @@
 #include "CoreTypes.h"
+#include "ProcessDataProfiler.h"
+#include "Debug.h"
 
-#include <Windows.h>
 #include <crtdbg.h>
-#include <stdio.h>
 
 #define SAFE_RELEASE(p) p->Release()
 #define GET_IID(ppType) IID_PPV_ARGS(ppType)
-
-void PrintLog(const char* format, ...)
-{
-	char buf[256];
-	va_list  args;
-	va_start(args, format);
-	vsprintf_s(buf, format, args);
-	OutputDebugString(buf);
-	va_end(args);
-}
 
 #include <string>
 #include <vector>
@@ -62,6 +52,8 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 	float frameTime = 0;
 	std::chrono::system_clock::time_point startTime, endTime;
 	startTime = std::chrono::system_clock::now();
+
+	he::InitializeProfileData();
 
 	// -------- create window ----------------------------------------------------------------
 
@@ -132,12 +124,12 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 		vkGetPhysicalDeviceFeatures(physicsDevice, &deviceFeature);
 
 		// print log
-		PrintLog("[Check Vulkan PhysicalDevice]\n");
-		PrintLog("-apiVersion    : %u\n", deviceProp.apiVersion);
-		PrintLog("-driverVersion : %u\n", deviceProp.driverVersion);
-		PrintLog("-vendorID      : %u\n", deviceProp.vendorID);
-		PrintLog("-deviceID      : %u\n", deviceProp.deviceID);
-		PrintLog("-deviceName    : %s\n", deviceProp.deviceName);
+		he::PrintLog("[Check Vulkan PhysicalDevice]\n");
+		he::PrintLog("-apiVersion    : %u\n", deviceProp.apiVersion);
+		he::PrintLog("-driverVersion : %u\n", deviceProp.driverVersion);
+		he::PrintLog("-vendorID      : %u\n", deviceProp.vendorID);
+		he::PrintLog("-deviceID      : %u\n", deviceProp.deviceID);
+		he::PrintLog("-deviceName    : %s\n", deviceProp.deviceName);
 
 		return deviceProp.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && deviceFeature.geometryShader;
 	};
@@ -357,7 +349,8 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 		startTime = endTime;
 		fps = 1.0f / frameTime;
 
-		PrintLog("fps : %d\n", (Int32)fps);
+		he::UpdateProfileData(frameTime);
+		//he::PrintLog("fps : %d\n", (Int32)fps);
 
 		// update
 
