@@ -167,13 +167,15 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 
 			for (auto& target : targetList)
 			{
+				GE::Math::Vector3 tempPos = target->position;
+				target->position += editVec;
+
 				// •¡”‘Ì‚Ìê‡A‰ñ“]‚ªˆÊ’u‚É‚à”½‰f‚³‚ê‚é‚æ‚¤‚É‚·‚é
 				if (targetList.size() > 1)
 				{
-					GE::Math::Vector3 vec = target->position - center;
-					target->position = GE::Math::Matrix4x4::Transform(vec, editRot.Rotation());
+					GE::Math::Vector3 vec = tempPos - center;
+					target->position = center + GE::Math::Matrix4x4::Transform(vec, editRot.Rotation()) + editVec;
 				}
-				target->position += editVec;
 				target->rotation *= editRot;
 				target->scale += editScl;
 			}
@@ -191,14 +193,14 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 
 			for (auto& target : targetList)
 			{
+				GE::Math::Vector3 tempPos = target->position;
 				target->position -= editVec;
 
 				// •¡”‘Ì‚Ìê‡A‰ñ“]‚ªˆÊ’u‚É‚à”½‰f‚³‚ê‚é‚æ‚¤‚É‚·‚é
 				if (targetList.size() > 1)
 				{
-					GE::Math::Vector3 vec = center - target->position;
-					vec = GE::Math::Matrix4x4::Transform(vec, GE::Math::Quaternion::Conjugate(editRot).Rotation());
-					target->position += vec;
+					GE::Math::Vector3 vec = tempPos - center;
+					target->position = center + GE::Math::Matrix4x4::Transform(vec, GE::Math::Quaternion::Conjugate(editRot).Rotation()) - editVec;
 				}
 
 				target->rotation *= GE::Math::Quaternion::Conjugate(editRot);
@@ -326,9 +328,14 @@ Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 	undoredo.Undo();
 	undoredo.Undo();
 	undoredo.Undo();
-
+	undoredo.Redo();
+	undoredo.Redo();
+	undoredo.Redo();
+	undoredo.Redo();
+	undoredo.Redo();
+	
 	// -------- frameRate counter ------------------------------------------------------------
-
+	
 	float fps = 0;
 	float frameTime = 0;
 	std::chrono::system_clock::time_point startTime, endTime;
