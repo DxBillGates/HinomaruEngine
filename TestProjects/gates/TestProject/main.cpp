@@ -1,5 +1,7 @@
 #include "CoreTypes.h"
 #include "ProcessDataProfiler.h"
+#include "Undoredo.h"
+#include "Math/include/Math.h"
 #include "Debug.h"
 
 #include <crtdbg.h>
@@ -45,6 +47,285 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 Int32 WINAPI WinMain(HINSTANCE testInstance, HINSTANCE, LPSTR, Int32)
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+
+	// -------- undoredo test ----------------------------------------------------------------
+
+	class IncrementCommand : public he::ICommand
+	{
+	private:
+		Int32* pValue;
+	public:
+		IncrementCommand(Int32* ptr) :pValue(ptr) {}
+
+		Void Do() override
+		{
+			++(*pValue);
+		}
+
+		Void Undo() override
+		{
+			--(*pValue);
+		}
+	};
+
+	class AddCommand : public he::ICommand
+	{
+	public:
+		Void Do() override
+		{
+			// addItem();
+		}
+
+		Void Undo() override
+		{
+			// deleteItem();
+		}
+	};
+
+	class DeleteCommand : public he::ICommand
+	{
+	private:
+		std::vector<Void*> backupDataList; // 削除前に保存しておくべきデータ
+	public:
+		~DeleteCommand()
+		{
+			for (auto& data : backupDataList)
+			{
+				delete data;
+			}
+		}
+
+		Void Do() override
+		{
+			/*
+			// Undoで元のデータに戻すためにバックアップを取っておく
+			auto selectDataList = lytGlobal::get_datalist()->get_select_item_data();
+			for(const auto& selectData : selectItemList)
+			{
+				Void* pBackup = new selectData.create_backup();
+				backupDataList.push_back();
+			}
+			*/
+		}
+
+		Void Undo() override
+		{
+			// addItem
+			/*
+			// データを追加するとともにバックアップデータを反映する
+			for(const auto& data : backupDataList)
+			{
+				auto pAddItem = addItem();
+				pAddItem.apply_backup(data);
+			}
+			*/
+		}
+	};
+
+	class EditTransformCommand : public he::ICommand
+	{
+	public:
+		struct Transform
+		{
+			GE::Math::Vector3 position;
+			GE::Math::Quaternion rotation;
+			GE::Math::Vector3 scale;
+		};
+	private:
+		/*
+		TPL::vector<Int32> targetList; // uidベースのターゲットリスト
+		*/
+
+		std::vector<Transform*> targetList;
+
+		GE::Math::Vector3 editVec;
+		GE::Math::Quaternion editRot;
+		GE::Math::Vector3 editScl;
+	public:
+		// コンストラクタに編集前と編集後のトランスフォームをわたし、差分を計算
+		EditTransformCommand(Transform prev, Transform after, std::vector<Transform>& targets)
+		{
+			editVec = after.position - prev.position;
+			editRot = after.rotation * GE::Math::Quaternion::Conjugate(prev.rotation);
+			editScl = after.scale - prev.scale;
+
+			for (auto& target : targets)
+			{
+				targetList.push_back(&target);
+			}
+		}
+
+		Void Do() override
+		{
+			GE::Math::Vector3 center = GE::Math::Vector3(0.f);
+			for (const auto& target : targetList)
+			{
+				center += target->position;
+			}
+			center /= targetList.size();
+
+
+			for (auto& target : targetList)
+			{
+				// 複数体の場合、回転が位置にも反映されるようにする
+				if (targetList.size() > 1)
+				{
+					GE::Math::Vector3 vec = target->position - center;
+					target->position = GE::Math::Matrix4x4::Transform(vec, editRot.Rotation());
+				}
+				target->position += editVec;
+				target->rotation *= editRot;
+				target->scale += editScl;
+			}
+		}
+
+		Void Undo() override
+		{
+			GE::Math::Vector3 center = GE::Math::Vector3(0.f);
+			for (const auto& target : targetList)
+			{
+				center += target->position;
+			}
+			center /= targetList.size();
+
+
+			for (auto& target : targetList)
+			{
+				target->position -= editVec;
+
+				// 複数体の場合、回転が位置にも反映されるようにする
+				if (targetList.size() > 1)
+				{
+					GE::Math::Vector3 vec = center - target->position;
+					vec = GE::Math::Matrix4x4::Transform(vec, GE::Math::Quaternion::Conjugate(editRot).Rotation());
+					target->position += vec;
+				}
+
+				target->rotation *= GE::Math::Quaternion::Conjugate(editRot);
+				target->scale -= editScl;
+			}
+		}
+	};
+
+	//GE::Math::Quaternion testAQuatOrigin, testAQuat;
+	//GE::Math::Quaternion testBQuatOrigin, testBQuat;
+	//GE::Math::Quaternion testCQuatOrigin, testCQuat;
+	//testAQuatOrigin = testAQuat = GE::Math::Quaternion(GE::Math::Vector3(0, 1.f, 0), GE::Math::ConvertToRadian(45.f));
+	//testBQuatOrigin = testBQuat = GE::Math::Quaternion(GE::Math::Vector3(0, 1.f, 0), GE::Math::ConvertToRadian(90.f));
+	//testCQuatOrigin = testCQuat = GE::Math::Quaternion(GE::Math::Vector3(0, 1.f, 0), GE::Math::ConvertToRadian(0.f));
+
+	//for (Int32 i = 0; i < 10; ++i)
+	//{
+	//	testAQuat *= GE::Math::Quaternion(GE::Math::Vector3(0, 1.f, 0), GE::Math::ConvertToRadian(1.f));
+	//	testBQuat *= GE::Math::Quaternion(GE::Math::Vector3(0, 1.f, 0), GE::Math::ConvertToRadian(1.f));
+	//	testCQuat *= GE::Math::Quaternion(GE::Math::Vector3(0, 1.f, 0), GE::Math::ConvertToRadian(1.f));
+	//}
+
+	//GE::Math::Quaternion subAQuat = GE::Math::Quaternion::Conjugate(testAQuatOrigin) * testAQuat;
+	//GE::Math::Quaternion subBQuat = GE::Math::Quaternion::Conjugate(testBQuatOrigin) * testBQuat;
+	//GE::Math::Quaternion subCQuat = GE::Math::Quaternion::Conjugate(testCQuatOrigin) * testCQuat;
+
+	//GE::Math::Quaternion tempAQuat = testAQuatOrigin * subAQuat;
+	//GE::Math::Quaternion tempBQuat = testBQuatOrigin * subBQuat;
+	//GE::Math::Quaternion tempCQuat = testCQuatOrigin * subCQuat;
+
+	//tempAQuat *= GE::Math::Quaternion::Conjugate(subAQuat);
+	//tempBQuat *= GE::Math::Quaternion::Conjugate(subBQuat);
+	//tempCQuat *= GE::Math::Quaternion::Conjugate(subCQuat);
+
+	he::Undoredo undoredo;
+
+	//Int32 testValue = 0;
+	//undoredo.IssueCommand(new IncrementCommand(&testValue), true);
+	//undoredo.Undo();
+	//undoredo.IssueCommand(new IncrementCommand(&testValue), true);
+	//undoredo.Redo();
+	//undoredo.Undo();
+	//undoredo.Redo();
+	//undoredo.Undo();
+	//undoredo.Redo();
+	//undoredo.Undo();
+	//undoredo.Redo();
+	//undoredo.Undo();
+
+	EditTransformCommand::Transform gizmoPrev;
+	EditTransformCommand::Transform gizmoAfter;
+	std::vector<EditTransformCommand::Transform> target;
+
+	// 単体テスト
+	EditTransformCommand::Transform test;
+	target = { test };
+
+	// 移動テスト
+	gizmoPrev = {};
+	gizmoPrev.position = {};
+	gizmoAfter = {};
+	gizmoAfter.position = gizmoPrev.position + GE::Math::Vector3(100, 0, 0);
+	undoredo.IssueCommand(new EditTransformCommand(gizmoPrev, gizmoAfter, target), true);
+
+	// 回転テスト
+	gizmoPrev = {};
+	gizmoPrev.rotation = {};
+	gizmoAfter = {};
+	gizmoAfter.rotation = gizmoPrev.rotation * GE::Math::Quaternion(GE::Math::Vector3(0, 1, 0), GE::Math::ConvertToRadian(10.f));
+	undoredo.IssueCommand(new EditTransformCommand(gizmoPrev, gizmoAfter, target), true);
+	gizmoPrev.rotation = gizmoAfter.rotation;
+	gizmoAfter.rotation = gizmoPrev.rotation * GE::Math::Quaternion(GE::Math::Vector3(0, 1, 0), GE::Math::ConvertToRadian(10.f));
+	undoredo.IssueCommand(new EditTransformCommand(gizmoPrev, gizmoAfter, target), true);
+	gizmoPrev.rotation = gizmoAfter.rotation;
+	gizmoAfter.rotation = gizmoPrev.rotation * GE::Math::Quaternion(GE::Math::Vector3(0, 1, 0), GE::Math::ConvertToRadian(10.f));
+	undoredo.IssueCommand(new EditTransformCommand(gizmoPrev, gizmoAfter, target), true);
+
+	// 拡縮テスト
+	gizmoPrev = {};
+	gizmoPrev.scale = {};
+	gizmoAfter = {};
+	gizmoAfter.scale = gizmoPrev.scale + GE::Math::Vector3(10.f);
+	undoredo.IssueCommand(new EditTransformCommand(gizmoPrev, gizmoAfter, target), true);
+	
+	undoredo.Undo();
+	undoredo.Undo();
+	undoredo.Undo();
+	undoredo.Undo();
+	undoredo.Undo();
+
+	// 複数テスト
+	EditTransformCommand::Transform testA{ GE::Math::Vector3(100, 0, 0), GE::Math::Quaternion(), GE::Math::Vector3()};
+	EditTransformCommand::Transform testB{ GE::Math::Vector3(-100, 0, 0), GE::Math::Quaternion(GE::Math::Vector3(0,1,0), GE::Math::ConvertToRadian(90.f)), GE::Math::Vector3()};
+	target = { testA, testB };
+
+	// 移動テスト
+	gizmoPrev = {};
+	gizmoPrev.position = {};
+	gizmoAfter = {};
+	gizmoAfter.position = gizmoPrev.position + GE::Math::Vector3(100, 0, 0);
+	undoredo.IssueCommand(new EditTransformCommand(gizmoPrev, gizmoAfter, target), true);
+
+	// 回転テスト
+	gizmoPrev = {};
+	gizmoPrev.rotation = {};
+	gizmoAfter = {};
+	gizmoAfter.rotation = gizmoPrev.rotation * GE::Math::Quaternion(GE::Math::Vector3(0, 1, 0), GE::Math::ConvertToRadian(10.f));
+	undoredo.IssueCommand(new EditTransformCommand(gizmoPrev, gizmoAfter, target), true);
+	gizmoPrev.rotation = gizmoAfter.rotation;
+	gizmoAfter.rotation = gizmoPrev.rotation * GE::Math::Quaternion(GE::Math::Vector3(0, 1, 0), GE::Math::ConvertToRadian(10.f));
+	undoredo.IssueCommand(new EditTransformCommand(gizmoPrev, gizmoAfter, target), true);
+	gizmoPrev.rotation = gizmoAfter.rotation;
+	gizmoAfter.rotation = gizmoPrev.rotation * GE::Math::Quaternion(GE::Math::Vector3(0, 1, 0), GE::Math::ConvertToRadian(10.f));
+	undoredo.IssueCommand(new EditTransformCommand(gizmoPrev, gizmoAfter, target), true);
+
+	// 拡縮テスト
+	gizmoPrev = {};
+	gizmoPrev.scale = {};
+	gizmoAfter = {};
+	gizmoAfter.scale = gizmoPrev.scale + GE::Math::Vector3(10.f);
+	undoredo.IssueCommand(new EditTransformCommand(gizmoPrev, gizmoAfter, target), true);
+
+	undoredo.Undo();
+	undoredo.Undo();
+	undoredo.Undo();
+	undoredo.Undo();
+	undoredo.Undo();
 
 	// -------- frameRate counter ------------------------------------------------------------
 

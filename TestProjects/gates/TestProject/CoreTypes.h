@@ -12,4 +12,6 @@ using UInt16 = unsigned short;
 using UInt32 = unsigned int;
 using UInt64 = unsigned long long;
 
+using Void = void;
+
 static const float DELTATIME60 = 1.f / 60.f;
